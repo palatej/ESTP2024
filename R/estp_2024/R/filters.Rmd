@@ -1,0 +1,275 @@
+---
+title: "Filters"
+output:
+  beamer_presentation: default
+  ioslides_presentation: default
+date: "2024-10-07"
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages(library(rjd3toolkit))
+library(ggplot2)
+
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Outline
+
+## Data
+
+### Flow of the river Nule
+
+```{r data, echo = TRUE}
+plot(Nile)
+```
+
+## Pre-specified filters
+
+Filters based on well-defined mathematical properties
+
+### Henderson filters
+
+```{r henderson, echo = FALSE}
+
+nh<-17
+
+hnile<-rjd3x11plus::henderson(Nile, nh)
+ts.plot(ts.union(Nile, hnile), col=c("black", "blue"))
+
+```
+
+## Henderson filter properties
+
+
+```{r henderson_properties, echo = FALSE}
+
+# helper function
+henderson<-function(n){
+  jfilter<-rJava::.jcall("jdplus/toolkit/base/core/math/linearfilters/HendersonFilters",     "Ljdplus/toolkit/base/core/math/linearfilters/SymmetricFilter;", "ofLength", as.integer(n))
+  w<-rJava::.jcall(jfilter, "[D", "weightsToArray")
+  ff<-rjd3filters::moving_average(w, lags=-(length(w)-1)/2)
+  return(ff)
+}
+
+ff<-henderson(nh)
+par(mfrow=c(1,2))
+barplot(ff@coefficients, main="weights")
+rjd3filters::plot_gain(ff, main="gain")
+par(mfrow=c(1,1))
+```
+
+## Local polynomials
+
+
+Regression with a linear trend on 11 periods, using a bi-weight kernel $\alpha(1-x^2)^2)$
+
+
+
+```{r lp, echo = FALSE}
+lpnile<-rjd3filters::localpolynomials(x=Nile, horizon=5, degree=1, kernel="biweight", endpoints = "DAF")
+hnile<-rjd3x11plus::henderson(Nile, nh)
+ts.plot(ts.union(Nile, hnile, lpnile), col=c("black", "cyan", "blue"))
+
+```
+
+## Loess filter properties
+
+
+```{r lp_properties, echo = FALSE}
+lp<-rjd3filters::lp_filter(horizon=5, degree=1, kernel="biweight", endpoints = "DAF")
+par(mfrow=c(1,2))
+barplot(lp@sfilter@coefficients, main="weights")
+rjd3filters::plot_gain(lp@sfilter, main="gain")
+par(mfrow=c(1,1))
+
+```
+
+## Model-based filters (I)
+
+### Structural model (fixed parameters)
+
+\tiny
+
+\begin{align*} 
+y(t) &= T(t)+N(t) \\
+\Delta^2 T(t) &= \epsilon_T(t) \quad &\epsilon_T \sim N(0,1) \\
+N(t) &=\epsilon_N(t) \quad &\epsilon_N \sim N(0,\lambda)
+\end{align*}
+
+```{r sts_code, echo = TRUE}
+
+hp_ucm<-function(lambda=25){
+  i2<-rjd3toolkit::arima_model("trend", delta = c(1,-2, 1))
+  noise<-rjd3toolkit::arima_model(variance=lambda)
+  ucm<-rjd3toolkit::ucarima_model(components=list(i2, noise))
+}
+
+ucm_estimate<-function(x, ucm, stdev=TRUE){
+  jucm<-rjd3toolkit:::.r2jd_ucarima(ucm)
+  jcmps<-rJava::.jcall("jdplus/toolkit/base/r/arima/UcarimaModels", 
+            "Ljdplus/toolkit/base/api/math/matrices/Matrix;", "estimate",
+            as.numeric(x), jucm, as.logical(stdev))
+  return(rjd3toolkit:::.jd2r_matrix(jcmps))
+}
+
+hp_estimate<-function(s, lambda=25){
+  ucm<-hp_ucm(lambda = lambda)
+  rslt<-ucm_estimate(s, ucm)
+}
+
+```
+
+\normalsize
+
+## Model-based filters (I)
+
+### Structural model (fixed parameters)
+
+
+```{r sts_rslt, echo = FALSE}
+lambda=25
+hp<-hp_estimate(Nile, lambda)
+trend=hp[,1]
+etrend=hp[,3]
+
+w<-data.frame(date=rjd3toolkit::daysOf(Nile),
+              y=as.numeric(Nile),
+              trend=trend,
+              lp=lpnile,
+              h=hnile,
+              min=as.numeric(trend-etrend),
+              max=as.numeric(trend+etrend))
+
+p<-ggplot(data=w) +
+  geom_line(aes(x=date, y=y), color='black') +
+  geom_line(aes(x=date, y=trend), color='red') +
+  geom_line(aes(x=date, y=lp), color='blue') +
+  geom_line(aes(x=date, y=h), color='green') +
+  geom_ribbon(aes(x=date, ymin=min, ymax=max), alpha=.2)
+
+plot(p)
+
+```
+
+
+
+## Model-based filters properties
+
+### Structural model (fixed parameters)
+
+```{r sts_properties, echo = FALSE}
+hp<-hp_ucm(lambda=lambda)
+wk_trend<-rjd3toolkit::ucarima_wk(hp, 1)
+
+par(mfrow=c(1,2))
+barplot(wk_trend$filter[1:18], main="weights")
+nxlab = 7
+xlim=c(0, pi)
+xlabel <- function(x, symbol = "pi"){
+  fracs <- strsplit(attr(MASS::fractions(x), "fracs"), "/")  # convert to fractions
+  labels <- sapply(fracs, function(i)
+    if (length(i) > 1) { paste(i[1], "*", symbol, "/", i[2]) }
+    else { paste(i, "*", symbol) })
+  labels <- sub("0 * pi", "0", labels, fixed = TRUE)
+  labels <- sub("1 * pi", " pi", labels, fixed = TRUE)
+  parse(text = labels)
+}
+
+gain<-sqrt(wk_trend$gain2)
+n<-length(gain)-1
+plot(cbind((0:600)*(pi/n),gain), type = "l",
+       xaxt = "n", xlab = "",
+       ylab = "gain", xlim = xlim, main="gain")
+    x_lab_at <- seq(xlim[1]/pi, xlim[2]/pi, length.out = nxlab)
+    axis(1, at = x_lab_at * pi, labels = xlabel(x_lab_at))
+par(mfrow=c(1,1))
+
+
+
+```
+## Model-based filters properties
+
+### Canonical decomposition
+
+\tiny
+
+```{r arima_code, echo = TRUE}
+
+hp_ucm<-function(lambda=25){
+  i2<-rjd3toolkit::arima_model("trend", delta = c(1,-2, 1))
+  noise<-rjd3toolkit::arima_model(variance=lambda)
+  ucm<-rjd3toolkit::ucarima_model(components=list(i2, noise))
+}
+
+ucm_estimate<-function(x, ucm, stdev=TRUE){
+  jucm<-rjd3toolkit:::.r2jd_ucarima(ucm)
+  jcmps<-rJava::.jcall("jdplus/toolkit/base/r/arima/UcarimaModels", 
+            "Ljdplus/toolkit/base/api/math/matrices/Matrix;", "estimate",
+            as.numeric(x), jucm, as.logical(stdev))
+  return(rjd3toolkit:::.jd2r_matrix(jcmps))
+}
+
+hp_estimate<-function(s, lambda=25){
+  ucm<-hp_ucm(lambda = lambda)
+  rslt<-ucm_estimate(s, ucm)
+}
+
+```
+
+\normalsize
+
+## Model-based filters
+
+### Canonical decomposition
+
+
+
+```{r arima_rslt, echo = FALSE}
+arima<-sarima_estimate(Nile, order=c(0,1,1))
+sarima<-sarima_model(period = 1, d=1, theta = arima$parameters$val[1])
+ucm<-sarima_decompose(sarima)
+rslt<-ucm_estimate(Nile, ucm)
+
+trend<-rslt[,1]
+etrend<-rslt[,3]
+w<-data.frame(date=rjd3toolkit::daysOf(Nile),
+              y=as.numeric(Nile),
+              trend=trend,
+              lp=lpnile,
+              h=hnile,
+              min=as.numeric(trend-etrend),
+              max=as.numeric(trend+etrend))
+
+p<-ggplot(data=w) +
+  geom_line(aes(x=date, y=y), color='black') +
+  geom_line(aes(x=date, y=trend), color='red') +
+  geom_line(aes(x=date, y=lp), color='blue') +
+  geom_line(aes(x=date, y=h), color='green') +
+  geom_ribbon(aes(x=date, ymin=min, ymax=max), alpha=.2)
+
+plot(p)
+
+```
+
+
+## Model-based filters properties
+
+### Canonical decomposition
+
+
+```{r arima_properties, echo = FALSE}
+wk_trend<-rjd3toolkit::ucarima_wk(ucm, 1)
+
+par(mfrow=c(1,2))
+barplot(wk_trend$filter[1:18], main="weights")
+
+gain<-sqrt(wk_trend$gain2)
+n<-length(gain)-1
+plot(cbind((0:600)*(pi/n),gain), type = "l",
+       xaxt = "n", xlab = "",
+       ylab = "gain", xlim = xlim, main="gain")
+    x_lab_at <- seq(xlim[1]/pi, xlim[2]/pi, length.out = nxlab)
+    axis(1, at = x_lab_at * pi, labels = xlabel(x_lab_at))
+par(mfrow=c(1,1))
+
+```
