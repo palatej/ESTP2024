@@ -13,7 +13,19 @@ library(ggplot2)
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
+## Introduction
+
+To extract information from a time series or -equivalently - to remove unwanted noises, we often apply linear filters. The filters can be built following quite different approaches. Using an annual time series, we consider different solutions to extract its trend. Similar derivations are used in seasonal adjustment procedures. By considering only the trend extraction, we can focus on the most relevant aspects of the various approaches.
+
 ## Outline
+
+-   Description of the Data
+-   Pre-specified filters
+    -   Henderson filters
+-   Local polynomials
+-   Mode-based filters
+    -   Structural models with fixed parameters (Hodrick-Prescott)
+    -   Parametric ARIMA and canonical decomposition
 
 ## Data
 
@@ -27,19 +39,30 @@ plot(Nile)
 
 Filters based on well-defined mathematical properties
 
-### Henderson filters
+### Example: Henderson filters
+
+
+The Henderson filter $\{\omega_i\}_{-p\le i \le p}$ is defined by minimizing $\sum_{i=-p}^p{(\Delta^3\omega_i)^2}$
+under the constraints: $\sum_{i=-p}^p{\omega_i}=1$, $\sum_{i=-p}^p{i\omega_i}=0$ and $\sum_{i=-p}^p{i^2\omega_i}=0$
+
+
+
+```{r henderson_ccode, echo = TRUE}
+
+nh<-17
+hnile<-rjd3x11plus::henderson(Nile, nh)
+
+```
+
+## Applying Henderson filters extended by Musgrave filters (X11-like)
 
 ```{r henderson, echo = FALSE}
 
-nh<-17
-
-hnile<-rjd3x11plus::henderson(Nile, nh)
 ts.plot(ts.union(Nile, hnile), col=c("black", "blue"))
 
 ```
 
 ## Henderson filter properties
-
 
 ```{r henderson_properties, echo = FALSE}
 
@@ -60,10 +83,7 @@ par(mfrow=c(1,1))
 
 ## Local polynomials
 
-
-Regression with a linear trend on 11 periods, using a bi-weight kernel $\alpha(1-x^2)^2)$
-
-
+For each time point, the smoothed value is defined by the regression with a linear trend on 11 periods, using a bi-weight kernel $\alpha(1-x^2)^2)$
 
 ```{r lp, echo = FALSE}
 lpnile<-rjd3filters::localpolynomials(x=Nile, horizon=5, degree=1, kernel="biweight", endpoints = "DAF")
@@ -73,7 +93,6 @@ ts.plot(ts.union(Nile, hnile, lpnile), col=c("black", "cyan", "blue"))
 ```
 
 ## Loess filter properties
-
 
 ```{r lp_properties, echo = FALSE}
 lp<-rjd3filters::lp_filter(horizon=5, degree=1, kernel="biweight", endpoints = "DAF")
@@ -125,7 +144,6 @@ hp_estimate<-function(s, lambda=25){
 
 ### Structural model (fixed parameters)
 
-
 ```{r sts_rslt, echo = FALSE}
 lambda=25
 hp<-hp_estimate(Nile, lambda)
@@ -150,8 +168,6 @@ p<-ggplot(data=w) +
 plot(p)
 
 ```
-
-
 
 ## Model-based filters properties
 
@@ -187,6 +203,7 @@ par(mfrow=c(1,1))
 
 
 ```
+
 ## Model-based filters properties
 
 ### Canonical decomposition
@@ -222,8 +239,6 @@ hp_estimate<-function(s, lambda=25){
 
 ### Canonical decomposition
 
-
-
 ```{r arima_rslt, echo = FALSE}
 arima<-sarima_estimate(Nile, order=c(0,1,1))
 sarima<-sarima_model(period = 1, d=1, theta = arima$parameters$val[1])
@@ -251,11 +266,9 @@ plot(p)
 
 ```
 
-
 ## Model-based filters properties
 
 ### Canonical decomposition
-
 
 ```{r arima_properties, echo = FALSE}
 wk_trend<-rjd3toolkit::ucarima_wk(ucm, 1)
