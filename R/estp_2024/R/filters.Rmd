@@ -41,11 +41,7 @@ Filters based on well-defined mathematical properties
 
 ### Example: Henderson filters
 
-
-The Henderson filter $\{\omega_i\}_{-p\le i \le p}$ is defined by minimizing $\sum_{i=-p}^p{(\Delta^3\omega_i)^2}$
-under the constraints: $\sum_{i=-p}^p{\omega_i}=1$, $\sum_{i=-p}^p{i\omega_i}=0$ and $\sum_{i=-p}^p{i^2\omega_i}=0$
-
-
+The Henderson filter $\{\omega_i\}_{-p\le i \le p}$ is defined by minimizing $\sum_{i=-p}^p{(\Delta^3\omega_i)^2}$ under the constraints: $\sum_{i=-p}^p{\omega_i}=1$, $\sum_{i=-p}^p{i\omega_i}=0$ and $\sum_{i=-p}^p{i^2\omega_i}=0$
 
 ```{r henderson_ccode, echo = TRUE}
 
@@ -282,6 +278,38 @@ plot(cbind((0:600)*(pi/n),gain), type = "l",
        xaxt = "n", xlab = "",
        ylab = "gain", xlim = xlim, main="gain")
     x_lab_at <- seq(xlim[1]/pi, xlim[2]/pi, length.out = nxlab)
+    axis(1, at = x_lab_at * pi, labels = xlabel(x_lab_at))
+par(mfrow=c(1,1))
+
+```
+
+## Annexe: Differencing
+
+```{r differencing_code, echo = TRUE}
+
+## Filter x(t)-x(t-1) = (1-B)x(t)
+
+rf<-function(w){
+  1+complex(real=cos(w), imaginary = -sin(w))
+}
+
+w<-seq(0:600)*(pi/600)
+cw<-rf(w)
+
+gain<-Mod(cw)
+phase<-Arg(cw)
+## or phase<-Arg(cw)/w
+
+```
+
+## Properties
+
+```{r differencing_properties, echo = FALSE}
+
+par(mfrow=c(1,2))
+plot(cbind(w, gain), type='l', main="Gain", xaxt = "n", xlab="")
+    axis(1, at = x_lab_at * pi, labels = xlabel(x_lab_at))
+plot(cbind(w, phase), type='l', main="Phase", xaxt = "n", xlab="")
     axis(1, at = x_lab_at * pi, labels = xlabel(x_lab_at))
 par(mfrow=c(1,1))
 
