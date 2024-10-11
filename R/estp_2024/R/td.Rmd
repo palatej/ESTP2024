@@ -1,0 +1,65 @@
+---
+title: "Trading days"
+output:
+  beamer_presentation: default
+  ioslides_presentation: default
+date: "2024-10-07"
+---
+
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages(library(rjd3toolkit))
+library(rjd3tramoseats)
+library(rjd3providers)
+library(ggplot2)
+
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Data
+
+
+```{r test, echo=FALSE}
+data<-file.path(rprojroot::find_root(rprojroot::is_rstudio_project ), 'Data')
+rjd3providers::set_spreadsheet_paths(data)
+retail_new<-rjd3providers::spreadsheet_data("US-Retail.xlsx")$series
+
+s1<-retail_new$`Retail sales, total`$data
+s2<-ABS$X0.2.20.10.M
+
+plot(s1)
+
+```
+
+## Test for trading days
+
+\tiny
+
+```{r td, echo=TRUE}
+print(rjd3toolkit::td_f(log(s1), model='AIRLINE'))
+print(rjd3toolkit::td_f(log(s2), model='AIRLINE'))
+
+print(rjd3toolkit::td_canovahansen(log(s1), differencing = c(1,12))$joint)
+print(rjd3toolkit::td_canovahansen(log(s2), differencing = c(1,12))$joint)
+
+print(rjd3toolkit::td_timevarying(log(s1)))
+print(rjd3toolkit::td_timevarying(log(s2)))
+```
+
+\normalsize
+
+## Critical values for Canova-Hansen test for trading days
+
+Computation by simulations (200.000 for each length)
+
+```{r td_cv, echo=FALSE}
+l<-seq(60, 600, 60)
+p9<-c(1.20,1.12,1.20,1.25,1.29,1.32,1.34,1.36,1.37,1.38)
+p95<-c(1.23,1.16,1.26,1.33,1.39,1.43,1.46,1.49,1.51,1.52)
+p99<-c(1.28,1.22,1.36,1.48,1.57,1.64,1.69,1.74,1.78,1.80)
+p999<-c(1.35,1.28,1.46,1.63,1.76,1.85,1.94,2.01,2.07,2.12)
+
+chtd<-cbind(p9,p95,p99,p999)
+print(`rownames<-`(chtd, l))
+
+```
