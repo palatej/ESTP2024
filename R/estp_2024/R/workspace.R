@@ -1,9 +1,9 @@
-jws<-rjdemetra3::.jws_load(system.file('workspaces', 'test.xml', package='rjdemetra3'))
-ws<-rjdemetra3::read_workspace(jws, TRUE)
-jws2<-rjdemetra3::.jws_make_copy(jws)
+jws<-rjd3workspace::.jws_load(system.file('workspaces', 'test.xml', package='rjd3workspace'))
+ws<-rjd3workspace::read_workspace(jws, TRUE)
+jws2<-rjd3workspace::.jws_make_copy(jws)
 rjd3providers::set_spreadsheet_paths("c:/data/excel/new")
-rjdemetra3::.jws_refresh(jws2, 'Complete')
-ws2<-rjdemetra3::read_workspace(jws2)
+rjd3workspace::.jws_refresh(jws2, 'Complete')
+ws2<-rjd3workspace::read_workspace(jws2)
 
 
 SA1<-ws$processing$`SAProcessing-1`
